@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
   Swords,
   Shield,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import {
   LineChart,
@@ -33,7 +34,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { athletes, matchesByAthlete, getTrends } from "@/lib/mock-data";
+import { athletes as mockAthletes, matchesByAthlete, getTrends } from "@/lib/mock-data";
+import { supabase } from "@/lib/supabase";
 
 export default function AthleteProfilePage({
   params,
@@ -41,39 +43,72 @@ export default function AthleteProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const athlete = athletes.find((a) => a.id === id);
-  if (!athlete) {
+  const [athlete, setAthlete] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAthlete() {
+      const { data, error } = await supabase.from("athletes").select("*").eq("id", id).single();
+      if (!error && data) {
+        setAthlete({
+          ...data,
+          matchesAnalyzed: data.matches_analyzed || 0,
+        });
+      } else {
+        const mockA = mockAthletes.find((a) => a.id === id);
+        if (mockA) setAthlete(mockA);
+      }
+      setLoading(false);
+    }
+    fetchAthlete();
+  }, [id]);
+
+  if (loading) {
     return (
       <Shell>
-        <p>Athlete not found.</p>
+        <div className="flex items-center justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       </Shell>
     );
   }
 
+  if (!athlete) {
+    return (
+      <Shell>
+        <div className="flex h-[400px] flex-col items-center justify-center gap-4 text-center">
+          <Target className="h-10 w-10 text-muted-foreground" />
+          <h2 className="text-xl font-semibold">Athlete Not Found</h2>
+          <p className="text-muted-foreground">This athlete does not exist or was deleted.</p>
+          <Link href="/athletes" className="text-electric hover:underline text-sm">Return to Roster</Link>
+        </div>
+      </Shell>
+    );
+  }
+
+  // Handle matches tracking: 
   const matches = matchesByAthlete[athlete.id] || [];
   const trends = getTrends(athlete.id);
 
   const latestStats = matches[0]?.stats;
   const avgErrorRate = matches.length
     ? Math.round(
-        matches.reduce((s, m) => s + m.stats.error_rate, 0) / matches.length
+        matches.reduce((s: number, m: any) => s + m.stats.error_rate, 0) / matches.length
       )
     : 0;
   const avgRally = matches.length
     ? (
-        matches.reduce((s, m) => s + m.stats.avg_rally_length, 0) /
+        matches.reduce((s: number, m: any) => s + m.stats.avg_rally_length, 0) /
         matches.length
       ).toFixed(1)
     : "0";
   const avgOffWin = matches.length
     ? Math.round(
-        matches.reduce((s, m) => s + m.stats.offensive_win_rate, 0) /
+        matches.reduce((s: number, m: any) => s + m.stats.offensive_win_rate, 0) /
           matches.length
       )
     : 0;
   const avgDefWin = matches.length
     ? Math.round(
-        matches.reduce((s, m) => s + m.stats.defensive_win_rate, 0) /
+        matches.reduce((s: number, m: any) => s + m.stats.defensive_win_rate, 0) /
           matches.length
       )
     : 0;

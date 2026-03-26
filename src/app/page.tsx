@@ -71,16 +71,22 @@ export default function DashboardPage() {
   return (
     <Shell>
       {/* Page heading */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Academy Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Overview of Elite Academy performance and athlete activity.
-        </p>
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Academy Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Overview of Elite Academy performance and athlete activity.
+          </p>
+        </div>
+        <Link
+          href="/upload"
+          className="inline-flex items-center justify-center rounded-md bg-electric px-4 py-2 text-sm font-medium text-white shadow hover:bg-electric/90 transition-colors"
+        >
+          Upload New Match
+        </Link>
       </div>
-
-      {/* KPI Cards */}
       <div className="mb-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (
           <Card key={kpi.label} className="shadow-sm">
