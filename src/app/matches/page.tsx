@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Shell } from "@/components/shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -29,14 +29,32 @@ export default function MatchesPage() {
           *,
           athletes(name)
         `)
-        .order("upload_date", { ascending: false });
+        .order("upload_date", { ascending: false })
+        .limit(50);
 
       if (!error && data && data.length > 0) {
-        setMatches(data);
+        const seen = new Set<string>();
+        const unique: typeof data = [];
+        for (const m of data) {
+          const aid = m.athlete_id;
+          if (!aid || seen.has(aid)) continue;
+          seen.add(aid);
+          unique.push(m);
+          if (unique.length >= 5) break;
+        }
+        setMatches(unique);
       } else {
-        // Fallback to mock data
         const mockData = await import("@/lib/mock-data");
-        setMatches(mockData.recentMatches);
+        const seen = new Set<string>();
+        const unique: any[] = [];
+        for (const m of mockData.recentMatches) {
+          const aid = m.athleteId || m.athlete_id;
+          if (!aid || seen.has(aid)) continue;
+          seen.add(aid);
+          unique.push(m);
+          if (unique.length >= 5) break;
+        }
+        setMatches(unique);
       }
       setLoading(false);
     }
@@ -49,7 +67,7 @@ export default function MatchesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Matches</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            All uploaded and analyzed match footage.
+            Latest match per athlete. Full history stays in the database.
           </p>
         </div>
         <Link
@@ -88,7 +106,7 @@ export default function MatchesPage() {
                       </div>
                       <h3 className="mb-1 text-lg font-semibold">No matches analyzed yet</h3>
                       <p className="max-w-sm text-sm text-muted-foreground">
-                        Upload your first match footage to unlock AI insights, performance metrics, and automated coaching reports.
+                        Upload your first match footage to unlock performance insights, detailed metrics, and automated coaching reports.
                       </p>
                       <Link
                         href="/upload"

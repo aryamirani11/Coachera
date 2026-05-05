@@ -10,13 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { CheckCircle2, ChevronRight, Loader2, UploadCloud, Video } from "lucide-react";
-import { generateAIAnalysis, getGeminiKey } from "../api/analyze/action";
+import { generateAIAnalysis } from "../api/analyze/action";
+import { AddAthleteDialog } from "@/components/add-athlete-dialog";
 
 const loadingSteps = [
   "Uploading Match Footage...",
-  "Running AI Video Processing...",
-  "Extracting Gameplay Metrics...",
-  "Generating Coaching Report...",
+  "Running Coachera Video Analysis...",
+  "Extracting Performance Metrics...",
+  "Building Coaching Report...",
   "Finalizing Analysis...",
 ];
 
@@ -58,71 +59,26 @@ export default function UploadMatchPage() {
 
     try {
       const athlete = athletes.find(a => a.id === formData.athleteId);
-      
-      // Step 1: Upload Video direct to Gemini using REST API
-      const API_KEY = await getGeminiKey();
-      
-      const uploadRes = await fetch(
-        `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "X-Goog-Upload-Protocol": "raw",
-            "X-Goog-Upload-File-Name": file.name.replace(/[^a-zA-Z0-9.-]/g, "_"), // safe name
-            "Content-Type": file.type || "video/mp4",
-          },
-          body: file,
-        }
-      );
 
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload video to Gemini.");
-      }
-      const fileData = await uploadRes.json();
-      const fileUri = fileData.file.uri;
-      const fileName = fileData.file.name;
-      const fileMimeType = file.type || "video/mp4";
-
-      // Progress Simulation up to step 3 while we wait for backend API
-      let tempStep = 1;
       const interval = setInterval(() => {
         setStepIndex((prev) => Math.min(prev + 1, 3));
       }, 3000);
 
-      // Wait for Gemini to mark the video file as ACTIVE (Max wait: 3 minutes)
-      let pollCount = 0;
-      const MAX_POLLS = 36; // 36 * 5s = 180 seconds maximum polling
+      const body = new FormData();
+      body.append("video", file);
 
-      while (pollCount < MAX_POLLS) {
-        await new Promise((r) => setTimeout(r, 5000));
-        pollCount++;
-        
-        try {
-          const statusRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${API_KEY}`
-          );
-          
-          if (!statusRes.ok) {
-             console.error("Gemini polling status code error:", statusRes.status);
-             // If we hit 404 or something, log it but don't strictly throw yet in case of eventual consistency,
-             // but if it's 400+ consistently we might be stuck.
-          }
-          
-          const statusData = await statusRes.json();
-          if (statusData.state === "ACTIVE") break;
-          if (statusData.state === "FAILED") throw new Error("Gemini failed to process video.");
-          if (statusData.error) throw new Error(statusData.error.message || "Unknown Gemini API Error");
-        } catch (pollErr) {
-          console.error("Polling error:", pollErr);
-          if (pollCount >= MAX_POLLS) throw new Error("Timeout waiting for video processing.");
-        }
+      const uploadRes = await fetch("/api/upload-video", {
+        method: "POST",
+        body,
+      });
+
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to upload video.");
       }
 
-      if (pollCount >= MAX_POLLS) {
-        throw new Error("Video processing timed out after 3 minutes. Please try a shorter or compressed clip.");
-      }
+      const { fileUri, mimeType: fileMimeType } = await uploadRes.json();
 
-      // Step 2: Call Server Action to trigger Gemini AI analysis
       const analysisResult = await generateAIAnalysis(
         athlete,
         formData,
@@ -131,27 +87,26 @@ export default function UploadMatchPage() {
       );
 
       clearInterval(interval);
-      setStepIndex(4); // Finalizing
+      setStepIndex(4);
 
-      // Step 3: Delete actual raw video if you want, but for demo leave it.
-      
-      // Step 4: Save to Supabase
       const { data: insertedMatch, error } = await supabase.from("matches").insert({
         athlete_id: formData.athleteId,
         opponent: formData.opponent,
         result: formData.result,
         upload_date: formData.matchDate,
         ai_report: analysisResult,
-        score: "TBD", // Normally extracted from video!
+        score: "TBD",
         duration: "TBD"
       }).select().single();
 
       if (error) {
         console.error("Supabase insert error", error);
-      } else {
-        // Redirect to match report
-        router.push(`/athletes/${formData.athleteId}/matches/${insertedMatch.id}`);
+        alert("Failed to save match: " + (error.message || "Unknown error"));
+        setUploading(false);
+        return;
       }
+
+      router.push(`/athletes/${formData.athleteId}/matches/${insertedMatch.id}`);
       
     } catch (err) {
       console.error(err);
@@ -166,7 +121,7 @@ export default function UploadMatchPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight">Upload Match</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Provide match details and upload the footage for AI analysis.
+            Provide match details and upload the footage for Coachera analysis.
           </p>
         </div>
 
@@ -180,19 +135,25 @@ export default function UploadMatchPage() {
                     <h2 className="text-xl font-medium mb-4">Step 1: The Context</h2>
                     <div>
                       <Label>Select Athlete</Label>
-                      <select
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        value={formData.athleteId}
-                        onChange={(e) => setFormData({ ...formData, athleteId: e.target.value })}
-                        required
-                      >
-                        <option value="">-- Choose Athlete --</option>
-                        {athletes.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2 mt-1">
+                        <select
+                          className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={formData.athleteId}
+                          onChange={(e) => setFormData({ ...formData, athleteId: e.target.value })}
+                          required
+                        >
+                          <option value="">-- Choose Athlete --</option>
+                          {athletes.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                        <AddAthleteDialog onAdd={(newAthlete) => {
+                          setAthletes(prev => [...prev, newAthlete].sort((a, b) => a.name.localeCompare(b.name)));
+                          setFormData(prev => ({ ...prev, athleteId: newAthlete.id }));
+                        }} />
+                      </div>
                     </div>
 
                     <div>
@@ -255,7 +216,7 @@ export default function UploadMatchPage() {
                     <div>
                       <Label>Visual Description</Label>
                       <p className="text-xs text-muted-foreground mb-1">
-                        Help the AI identify your player (e.g. "My player is in the green shirt on the near side").
+                        Help Coachera identify your player (e.g. "My player is in the green shirt on the near side").
                       </p>
                       <Textarea
                         required
@@ -293,9 +254,7 @@ export default function UploadMatchPage() {
                           <>
                             <Video className="h-8 w-8 text-electric mb-2" />
                             <p className="text-sm font-medium text-electric">{file.name}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {(file.size / (1024 * 1024)).toFixed(2)} MB
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Ready for analysis</p>
                           </>
                         ) : (
                           <>
@@ -332,7 +291,7 @@ export default function UploadMatchPage() {
                   <Loader2 className="h-10 w-10 text-electric animate-spin" />
                 </div>
                 
-                <h2 className="text-lg font-semibold mb-6">Processing AI Analysis</h2>
+                <h2 className="text-lg font-semibold mb-6">Coachera is Analyzing</h2>
                 
                 <div className="w-full max-w-sm space-y-4">
                   {loadingSteps.map((step, idx) => {

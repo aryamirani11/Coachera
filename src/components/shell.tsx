@@ -20,11 +20,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
         className="flex flex-1 flex-col"
       >
         <Topbar />
-        <main className="flex-1 px-8 py-6">
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
+            className="mx-auto w-full max-w-7xl"
           >
             {children}
           </motion.div>

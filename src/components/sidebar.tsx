@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Users,
   FileBarChart,
   Settings,
-  Activity,
   Upload,
   ChevronLeft,
   ChevronRight,
@@ -47,9 +47,14 @@ export function Sidebar({
 
       {/* Logo */}
       <div className={`flex h-16 items-center ${isCollapsed ? 'justify-center px-0' : 'justify-start gap-2.5 px-6'}`}>
-        <div className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-lg bg-electric">
-          <Activity className="h-4.5 w-4.5 text-white" />
-        </div>
+        <Image
+          src="/coacheraLogo.png"
+          alt="Coachera"
+          width={isCollapsed ? 32 : 28}
+          height={isCollapsed ? 32 : 28}
+          className="min-w-[28px] invert brightness-0 invert"
+          style={{ filter: "invert(1)" }}
+        />
         {!isCollapsed && (
           <motion.span 
             initial={{ opacity: 0 }} 
