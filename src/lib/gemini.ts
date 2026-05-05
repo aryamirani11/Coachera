@@ -3,53 +3,40 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = process.env.GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-export const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+export const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export async function generateAIAnalysis(athleteData: any, matchData: any) {
+  const stats = matchData.stats || {};
+  const errors = matchData.errors || {};
+  const pc = matchData.point_construction || {};
+
   const prompt = `
-    You are an elite badminton coach and performance analyst. 
-    Analyze the following match data for athlete ${athleteData.name} (Ranking: ${athleteData.ranking ?? "N/A"}) 
-    against opponent ${matchData.opponent}.
+You are an elite badminton coach providing a concise performance debrief.
+Analyze match data for ${athleteData.name} (Rank: ${athleteData.ranking ?? "N/A"}) vs ${matchData.opponent}.
 
-    Match Summary:
-    - Result: ${matchData.result} (${matchData.score})
-    - Duration: ${matchData.duration}
-    - Total Points: ${matchData.stats.total_points}
-    - Error Rate: ${matchData.stats.error_rate}%
-    - Unforced Errors: ${matchData.stats.unforced_error_count}
-    - Offensive Win Rate: ${matchData.stats.offensive_win_rate}%
-    - Defensive Win Rate: ${matchData.stats.defensive_win_rate}%
-    - Avg Rally Length: ${matchData.stats.avg_rally_length} shots
+Result: ${matchData.result} (${matchData.score || "N/A"}) | Duration: ${matchData.duration || "N/A"}
+Stats: ${stats.total_points || "?"} pts, ${stats.error_rate || "?"}% error rate, ${stats.offensive_win_rate || "?"}% offensive win, ${stats.defensive_win_rate || "?"}% defensive win, avg rally ${stats.avg_rally_length || "?"} shots.
+Errors: Net ${errors.net_errors || 0}, OB ${errors.out_of_bounds || 0}, Misread ${errors.defensive_misread || 0}, Forced ${errors.forced_errors || 0}.
+Points won by: Smash ${pc.smash_finish || 0}%, Drop ${pc.drop_deception || 0}%, Opp Error ${pc.opponent_error || 0}%, Endurance ${pc.long_rally_endurance || 0}%.
 
-    Key Stats Breakdown:
-    - Rallies < 6 shots: ${matchData.stats.rallies_under_6}
-    - Rallies 6-12 shots: ${matchData.stats.rallies_6_12}
-    - Rallies > 12 shots: ${matchData.stats.rallies_over_12}
+FORMATTING RULES:
+- Each section's "content" must be a SINGLE string.
+- "Executive Summary" should be a SHORT paragraph (2-3 sentences). No bullet points.
+- ALL OTHER sections: use bullet points starting with "• " (bullet + space), separated by newlines.
+- 3-6 bullets per non-summary section. Each bullet 1-2 sentences MAX. Be specific and actionable.
+- NEVER reference specific timestamps. Use high-level phases: "early in the first set", "mid-game", "closing rallies", etc.
 
-    Error Breakdown:
-    - Net Errors: ${matchData.errors.net_errors}
-    - Out of Bounds: ${matchData.errors.out_of_bounds}
-    - Defensive Misreads: ${matchData.errors.defensive_misread}
-    - Forced Errors: ${matchData.errors.forced_errors}
-
-    Point Construction (Points won by):
-    - Smash finishes: ${matchData.point_construction.smash_finish}%
-    - Drop deception: ${matchData.point_construction.drop_deception}%
-    - Opponent error: ${matchData.point_construction.opponent_error}%
-    - endurance: ${matchData.point_construction.long_rally_endurance}%
-
-    Please generate a detailed, professional AI coaching report. 
-    Format the output as a JSON object with the following structure:
-    {
-      "title": "Match Performance Summary - [Date]",
-      "sections": [
-        { "heading": "Executive Summary", "content": "..." },
-        { "heading": "Offensive Insights", "content": "..." },
-        { "heading": "Defensive Observations", "content": "..." },
-        { "heading": "Tactical Adjustments", "content": "..." },
-        { "heading": "Training Recommendations", "content": "..." }
-      ]
-    }
+Return a raw JSON object (no markdown codeblocks):
+{
+  "title": "Match Performance Report",
+  "sections": [
+    { "heading": "Executive Summary", "content": "A concise 2-3 sentence paragraph." },
+    { "heading": "Offensive Insights", "content": "• ...\\n• ..." },
+    { "heading": "Defensive Observations", "content": "• ...\\n• ..." },
+    { "heading": "Tactical Adjustments", "content": "• ...\\n• ..." },
+    { "heading": "Training Recommendations", "content": "• ...\\n• ..." }
+  ]
+}
   `;
 
   try {
@@ -57,7 +44,10 @@ export async function generateAIAnalysis(athleteData: any, matchData: any) {
     const response = await result.response;
     const text = response.text();
     // Clean JSON from potential markdown blocks
-    const jsonStr = text.replace(/```json\n?|\n?```/g, "").trim();
+    const jsonStr = text
+      .replace(/```json\n?|\n?```/g, "")
+      .replace(/[\x00-\x1F\x7F]/g, (ch) => (ch === "\n" || ch === "\r" || ch === "\t" ? " " : ""))
+      .trim();
     return JSON.parse(jsonStr);
   } catch (error) {
     console.error("Gemini API Error:", error);
