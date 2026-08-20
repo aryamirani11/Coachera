@@ -1,0 +1,10 @@
+[project]
+name = "coachera-cv-pipeline"
+version = "0.1.0"
+description = "Badminton CV pipeline for structured coaching features"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
