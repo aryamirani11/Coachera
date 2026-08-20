@@ -8,7 +8,7 @@ import { CommandMenu } from "./command-menu";
 
 export function Topbar() {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white/60 px-8 backdrop-blur-xl transition-all">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-white/60 px-6 sm:px-8 backdrop-blur-xl transition-all">
       {/* Search */}
       <div className="flex items-center gap-3">
         <CommandMenu />

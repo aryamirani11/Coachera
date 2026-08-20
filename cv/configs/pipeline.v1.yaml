@@ -1,0 +1,16 @@
+pipeline:
+  version: "v1"
+  stages:
+    - ingest
+    - perception
+    - event_build
+    - analytics
+    - export
+
+runtime:
+  device: "auto"
+  max_video_seconds: 5400
+
+output:
+  include_debug_artifacts: false
+  schema_version: "ai_features.v1"

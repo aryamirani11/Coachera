@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Coachera – AI Video Analytics for Elite Badminton",
+  title: "Coachera – Video Analytics for Elite Badminton",
   description: "Structured performance intelligence for badminton academies",
 };
 
